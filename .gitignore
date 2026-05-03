@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+backend/data/transcripts/*
+backend/data/indexes/*
+uploads/
+*.pt
+*.bin
+
+# Keep gitkeep files
+!backend/data/transcripts/.gitkeep
+!backend/data/indexes/.gitkeep

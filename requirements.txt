@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+openai-whisper
+sentence-transformers
+faiss-cpu
+python-multipart
+python-dotenv
+pydantic
+aiofiles
+numpy
