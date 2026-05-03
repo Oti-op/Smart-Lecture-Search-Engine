@@ -45,11 +45,11 @@ cp .env.example .env
 ## Run
 
 ```bash
-uvicorn backend.main:app --reload --port 8000
+uvicorn backend.main:app --reload
 ```
 
-Then open `frontend/index.html` directly in your browser
-(File → Open File, or drag the file into a tab).
+Then open <http://127.0.0.1:8000> in your browser. The backend serves the
+frontend automatically — no separate file server or port needed.
 
 > **First run:** Whisper downloads the `base` model (~150 MB) and
 > `sentence-transformers` downloads `all-MiniLM-L6-v2` (~90 MB) on first use.
@@ -66,7 +66,7 @@ is running. ReDoc is at <http://localhost:8000/redoc>.
 |-----------------------|--------------------------|--------------------------------------|
 | `MAX_FILE_SIZE_MB`    | `100`                    | Maximum upload size in megabytes     |
 | `ALLOWED_EXTENSIONS`  | `mp3,mp4,wav,m4a,webm`   | Comma-separated list of allowed file types |
-| `CORS_ORIGINS`        | `http://localhost:3000`  | Comma-separated allowed CORS origins |
+| `CORS_ORIGINS`        | `http://localhost:3000`  | Comma-separated allowed CORS origins (not needed when using the built-in static serving) |
 | `TRUSTED_HOSTS`       | *(unset)*                | Comma-separated trusted hostnames; leave unset in development |
 
 ## Project layout

@@ -2,12 +2,14 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 load_dotenv()
@@ -20,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 _APP_VERSION = "1.0.0"
 
+BASE_DIR = Path(__file__).resolve().parent.parent
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 _TRANSCRIPTS_DIR = os.path.join(_BACKEND_DIR, "data", "transcripts")
 _INDEXES_DIR = os.path.join(_BACKEND_DIR, "data", "indexes")
@@ -65,7 +68,7 @@ def _build_app() -> FastAPI:
     # CORS — wraps TrustedHost so CORS headers are added to all passed responses.
     cors_origins = [
         o.strip()
-        for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+        for o in os.getenv("CORS_ORIGINS", "*").split(",")
         if o.strip()
     ]
     app.add_middleware(
@@ -104,6 +107,11 @@ def _build_app() -> FastAPI:
     async def health() -> dict:
         return {"status": "ok", "version": _APP_VERSION}
 
+    # Root route — serve the frontend index
+    @app.get("/", include_in_schema=False)
+    async def serve_index() -> FileResponse:
+        return FileResponse(BASE_DIR / "frontend" / "index.html")
+
     # Global exception handler — never leak stack traces to the client.
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(
@@ -114,6 +122,9 @@ def _build_app() -> FastAPI:
             status_code=500,
             content={"detail": "Internal server error"},
         )
+
+    # Static files mount — added LAST so API routes take priority
+    app.mount("/", StaticFiles(directory=BASE_DIR / "frontend"), name="static")
 
     return app
 
