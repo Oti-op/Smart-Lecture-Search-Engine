@@ -1,48 +1,96 @@
 # Smart Lecture Search Engine
 
-Search across lecture audio/video using semantic similarity.
+A semantic search engine for audio and video lecture recordings. Upload any recording
+(MP3, MP4, WAV, M4A, or WebM), and the engine transcribes it with OpenAI Whisper,
+splits the transcript into overlapping chunks, embeds each chunk with
+`sentence-transformers`, and stores the result in a FAISS vector index. You can then
+search across the recording using natural-language queries — finding relevant segments
+by meaning rather than exact keyword match.
 
-## Stack
+## Prerequisites
 
-- **Backend**: Python, FastAPI, Uvicorn
-- **ML**: openai-whisper, sentence-transformers, faiss-cpu
-- **Frontend**: Vanilla HTML/JS
-- **Storage**: JSON files (prototype)
+- **Python 3.9+**
+- **ffmpeg** — required by Whisper to decode audio from video containers
+
+  ```bash
+  # macOS
+  brew install ffmpeg
+
+  # Ubuntu / Debian
+  sudo apt install ffmpeg
+
+  # Windows (winget)
+  winget install ffmpeg
+  ```
 
 ## Setup
 
 ```bash
+# 1. Clone the repository
+git clone <repo-url>
 cd lecture-search
-cp .env.example .env
+
+# 2. Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+
+# 3. Install dependencies
 pip install -r requirements.txt
-uvicorn backend.main:app --reload
+
+# 4. Configure environment variables
+cp .env.example .env
+# Edit .env to adjust MAX_FILE_SIZE_MB, ALLOWED_EXTENSIONS, or CORS_ORIGINS
 ```
 
-## Project Structure
+## Run
+
+```bash
+uvicorn backend.main:app --reload --port 8000
+```
+
+Then open `frontend/index.html` directly in your browser
+(File → Open File, or drag the file into a tab).
+
+> **First run:** Whisper downloads the `base` model (~150 MB) and
+> `sentence-transformers` downloads `all-MiniLM-L6-v2` (~90 MB) on first use.
+> Both are cached locally and not re-downloaded on subsequent starts.
+
+## API docs
+
+Interactive Swagger UI is available at <http://localhost:8000/docs> while the server
+is running. ReDoc is at <http://localhost:8000/redoc>.
+
+## Environment variables
+
+| Variable              | Default                  | Description                          |
+|-----------------------|--------------------------|--------------------------------------|
+| `MAX_FILE_SIZE_MB`    | `100`                    | Maximum upload size in megabytes     |
+| `ALLOWED_EXTENSIONS`  | `mp3,mp4,wav,m4a,webm`   | Comma-separated list of allowed file types |
+| `CORS_ORIGINS`        | `http://localhost:3000`  | Comma-separated allowed CORS origins |
+| `TRUSTED_HOSTS`       | *(unset)*                | Comma-separated trusted hostnames; leave unset in development |
+
+## Project layout
 
 ```
 lecture-search/
   backend/
-    main.py               # FastAPI app entry point
+    main.py               # FastAPI app, middleware, lifespan
+    dependencies.py       # Singleton DI getters (Embedder, Transcriber)
     routers/
-      upload.py           # File upload endpoints
-      search.py           # Semantic search endpoints
+      upload.py           # POST /api/lectures/upload, GET /api/lectures
+      search.py           # POST /api/search
     services/
       transcriber.py      # Whisper transcription
-      embedder.py         # Sentence embedding
-      indexer.py          # FAISS index management
+      embedder.py         # sentence-transformers dense embedding
+      indexer.py          # FAISS index build / load / search
     models/
-      schemas.py          # Pydantic request/response models
+      schemas.py          # Pydantic request and response models
     data/
-      transcripts/        # Stored transcript JSON files
-      indexes/            # Stored FAISS index files
+      transcripts/        # Stored transcript JSON files (git-ignored)
+      indexes/            # Stored FAISS index files (git-ignored)
     utils/
-      file_utils.py       # File validation and path helpers
-      security.py         # Input sanitization helpers
+      file_utils.py       # Chunking, timestamp formatting, JSON I/O
+      security.py         # File validation, sanitisation, rate limiting
   frontend/
-    index.html            # Single-page UI
-  .env.example
-  .gitignore
-  requirements.txt
+    index.html            # Self-contained single-page UI
 ```
-# Smart-Lecture-Search-Engine

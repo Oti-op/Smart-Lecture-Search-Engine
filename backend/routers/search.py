@@ -1,14 +1,14 @@
 import os
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from backend.dependencies import get_embedder
 from backend.models.schemas import SearchRequest, SearchResponse, SearchResult
 from backend.services.embedder import Embedder
 from backend.services.indexer import LectureIndex
 from backend.utils.file_utils import format_timestamp
-from backend.utils.security import sanitize_query
+from backend.utils.security import check_rate_limit, sanitize_query
 
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _INDEXES_DIR = os.path.join(_BACKEND_DIR, "data", "indexes")
@@ -18,10 +18,15 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 
 @router.post("", response_model=SearchResponse)
 async def search_lecture(
+    request: Request,
     body: SearchRequest,
     embedder: Annotated[Embedder, Depends(get_embedder)],
 ) -> SearchResponse:
     """Semantic search over a single indexed lecture."""
+    ip = request.client.host if request.client else "unknown"
+    check_rate_limit(ip, limit=30)
+
+    # sanitize_query enforces the 3–300 character bounds before the embedder runs.
     query = sanitize_query(body.query)
 
     index = LectureIndex(lecture_id=body.lecture_id, data_dir=_INDEXES_DIR)

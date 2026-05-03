@@ -25,7 +25,7 @@ class LectureListResponse(BaseModel):
 
 class SearchRequest(BaseModel):
     lecture_id: str
-    query: str
+    query: str = Field(min_length=3, max_length=300)
     top_k: int = Field(default=5, ge=1, le=10)
 
 

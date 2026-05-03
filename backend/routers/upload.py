@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 import aiofiles
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, UploadFile
 
 from backend.dependencies import get_embedder, get_transcriber
 from backend.models.schemas import LectureListItem, LectureListResponse, UploadResponse
@@ -12,7 +12,12 @@ from backend.services.embedder import Embedder
 from backend.services.indexer import LectureIndex
 from backend.services.transcriber import Transcriber
 from backend.utils.file_utils import chunk_transcript, save_transcript
-from backend.utils.security import generate_lecture_id, sanitize_filename, validate_file
+from backend.utils.security import (
+    check_rate_limit,
+    generate_lecture_id,
+    sanitize_filename,
+    validate_file,
+)
 
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _TRANSCRIPTS_DIR = os.path.join(_BACKEND_DIR, "data", "transcripts")
@@ -30,12 +35,16 @@ def _remove_file(path: str) -> None:
 
 @router.post("/upload", response_model=UploadResponse, status_code=201)
 async def upload_lecture(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile,
     transcriber: Annotated[Transcriber, Depends(get_transcriber)],
     embedder: Annotated[Embedder, Depends(get_embedder)],
 ) -> UploadResponse:
     """Transcribe, chunk, embed, and index an uploaded audio/video lecture."""
+    ip = request.client.host if request.client else "unknown"
+    check_rate_limit(ip, limit=5)
+
     await validate_file(file)
 
     lecture_id = generate_lecture_id()

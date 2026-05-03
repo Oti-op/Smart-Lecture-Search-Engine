@@ -1,6 +1,9 @@
 import os
 import re
+import threading
+import time
 import uuid
+from collections import defaultdict
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -28,6 +31,38 @@ _EXTENSION_MIME_MAP: dict[str, tuple[str, ...]] = {
 
 _UNSAFE_CHARS_RE = re.compile(r"[^\w.\-]")
 
+# ── Rate limiting ──────────────────────────────────────────────────────────────
+# Sliding 60-second window per IP, stored as a list of monotonic timestamps.
+# A threading.Lock keeps the dict mutation safe in uvicorn's threaded worker model.
+_rate_store: dict[str, list[float]] = defaultdict(list)
+_rate_lock = threading.Lock()
+
+
+def check_rate_limit(ip: str, limit: int = 10) -> None:
+    """Raise HTTP 429 if ip has exceeded limit requests in the last 60 seconds.
+
+    Args:
+        ip:    Client IP address string.
+        limit: Maximum requests allowed per 60-second sliding window.
+
+    Raises:
+        HTTPException: 429 with a Retry-After header when the limit is exceeded.
+    """
+    now = time.monotonic()
+    cutoff = now - 60.0
+    with _rate_lock:
+        window = [t for t in _rate_store[ip] if t > cutoff]
+        if len(window) >= limit:
+            raise HTTPException(
+                status_code=429,
+                headers={"Retry-After": "60"},
+                detail="Rate limit exceeded. Please wait before sending another request.",
+            )
+        window.append(now)
+        _rate_store[ip] = window
+
+
+# ── File validation ────────────────────────────────────────────────────────────
 
 async def validate_file(file: UploadFile) -> None:
     """Validate extension, MIME type, and file size of an uploaded file."""
@@ -69,6 +104,8 @@ async def validate_file(file: UploadFile) -> None:
     if len(body) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
+
+# ── Filename / query sanitisation ──────────────────────────────────────────────
 
 def sanitize_filename(filename: str) -> str:
     """Return a safe, lowercase filename with path traversal removed."""
